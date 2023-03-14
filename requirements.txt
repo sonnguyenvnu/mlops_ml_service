@@ -1,0 +1,5 @@
+python-dotenv==1.0.0
+flask_cors==3.0.10
+redis==4.5.1
+argparse
+numpy
