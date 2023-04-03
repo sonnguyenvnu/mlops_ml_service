@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: push-job
+spec:
+  ttlSecondsAfterFinished: 10
+  template:
+    metadata:
+      name: push-job
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: push-job-container
+          image: python:3.8.16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip3 install redis argparse
+              echo "Pushing jobs to queue..."
+              python3 /mnt/job.py --redis_host=redis --queue_name=job2
+          volumeMounts:
+            - name: volume-pvc
+              mountPath: "/mnt"
+      volumes:
+        - name: volume-pvc
+          persistentVolumeClaim:
+            claimName: ml-service-pvc

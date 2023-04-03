@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training
+spec:
+  parallelism: 2
+  # ttlSecondsAfterFinished: 100
+  template:
+    metadata:
+      name: training
+      annotations:
+        tf-version.cloud-tpus.google.com: "2.11.0"
+    spec:
+      containers:
+      - name: training-container
+        image: tensorflow/tensorflow:2.11.0
+        resources:
+          limits:
+            cloud-tpus.google.com/preemptible-v2: 8
+        command:
+        - /bin/sh
+        - -c
+        - |
+          apt update && apt install git -y
+          pip install redis argparse google-cloud-storage mlflow==2.2.2
+          cd /tf/notebooks
+          python3 worker.py --redis_host=redis --queue_name=job2
+        volumeMounts:
+        - mountPath: "/tf/notebooks"
+          name: ml-service
+        env:
+          - name: MLFLOW_TRACKING_URI
+            valueFrom:
+              secretKeyRef:
+                name: mlflow-secret
+                key: uri
+          - name: MLFLOW_TRACKING_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: mlflow-secret
+                key: username
+          - name: MLFLOW_TRACKING_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mlflow-secret
+                key: password
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            valueFrom:
+              secretKeyRef:
+                name: mlflow-secret
+                key: credential-file
+          - name: REDIS_SERVICE_HOST
+            value: "redis"
+      volumes:
+      - name: ml-service
+        persistentVolumeClaim:
+          claimName: ml-service-pvc
+      restartPolicy: OnFailure

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-app-pod
+spec:
+  volumes:
+    - name: ml-service
+      persistentVolumeClaim:
+        claimName: ml-service-pvc
+  containers:
+    - name: nginx-app-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: ml-service
