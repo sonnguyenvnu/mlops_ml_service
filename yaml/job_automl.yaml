@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-automl
+spec:
+  parallelism: 2
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      name: training-automl
+      # annotations:
+      #   tf-version.cloud-tpus.google.com: "2.11.0"
+    spec:
+      containers:
+        - name: training-container
+          image: mailnophone03/automl:katib
+          imagePullPolicy: Always
+          # resources:
+          #   limits:
+          #     cloud-tpus.google.com/preemptible-v2: 8
+          command:
+            - /bin/sh
+            - -c
+            - |
+              python3 test.py --redis_host=redis --queue_name=automl
+          # volumeMounts:
+          # - mountPath: "/app"
+          #   name: ml-service
+          env:
+            - name: MLFLOW_TRACKING_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: uri
+            - name: MLFLOW_TRACKING_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: username
+            - name: MLFLOW_TRACKING_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: password
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: example_experiment
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: credential-file
+            - name: REDIS_SERVICE_HOST
+              value: redis
+            - name: QUEUE_NAME
+              value: automl
+      # volumes:
+      # - name: ml-service
+      #   persistentVolumeClaim:
+      #     claimName: ml-service-pvc
+      restartPolicy: OnFailure

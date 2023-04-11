@@ -173,8 +173,8 @@ def write_tfrecord_dataset():
 
     if len(datasets) > 0:
         dataset = datasets[0]
-    for i in range(1, len(datasets)):
-        dataset = dataset.concatenate(datasets[i])
+        for i in range(1, len(datasets)):
+            dataset = dataset.concatenate(datasets[i])
     else:
         dataset = None
     num_images = int(tf.data.experimental.cardinality(dataset).numpy())

@@ -4,16 +4,12 @@ import time
 import argparse
 import re
 import rediswq
-from pretrained import train_model
-from train_util import get_train_config
-import tensorflow as tf
-import numpy as np
+import mlflow
 
-AUTOTUNE = tf.data.AUTOTUNE
 parser = argparse.ArgumentParser(description='Training container')
 parser.add_argument('--redis_host', type=str, default="redis", metavar='N',
                     help='redis host contains job queue')
-parser.add_argument('--queue_name', type=str, default="job2", metavar='N',
+parser.add_argument('--queue_name', type=str, default="automl", metavar='N',
                     help='queue name')
 args = parser.parse_args()
 
@@ -35,19 +31,30 @@ while q.empty():
   if wait_time > 300:  # 300s
     break
 
-cached_config = {}
 while not q.empty():
   item = q.lease(lease_secs=10, block=True, timeout=2)
   if item is not None:
     itemstr = item.decode("utf-8")
     job = json.loads(itemstr)
+    print('Job:', itemstr)
     print('==================================')
-    print(">>> Working on: " + job.get('model_name'))
-    train_config, cached_config = get_train_config(
-        job, cached_config, automl=False)
-    train_model(train_config)
-    # cmd = f"python3 ./train.py --model_name={job['model_name']} --num_epochs={job['num_epochs']} --dataset_url={job['dataset_url']} --num_classes={job['num_classes']}"
-    # os.system(cmd)
+    print(">>> Working on: " + job.get('run_name'))
+    run_name = job.get('run_name')
+
+    mlflow.start_run()
+    mlflow.set_tag("mlflow.runName", run_name)
+    time.sleep(20)
+    metrics = {
+        'train_loss': 0.0123,
+        'train_accuracy': 0.9612,
+        'val_loss': 0.932211,
+        'val_accuracy': 0.76832,
+    }
+    mlflow.log_metrics(metrics)
+    mlflow.log_metrics(metrics)
+    mlflow.log_metrics(metrics)
+    mlflow.end_run()
+
     q.complete(item)
   else:
     print("Waiting for work")

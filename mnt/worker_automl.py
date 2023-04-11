@@ -4,7 +4,7 @@ import time
 import argparse
 import re
 import rediswq
-from pretrained import train_model
+from automl import train_model
 from train_util import get_train_config
 import tensorflow as tf
 import numpy as np
@@ -13,7 +13,7 @@ AUTOTUNE = tf.data.AUTOTUNE
 parser = argparse.ArgumentParser(description='Training container')
 parser.add_argument('--redis_host', type=str, default="redis", metavar='N',
                     help='redis host contains job queue')
-parser.add_argument('--queue_name', type=str, default="job2", metavar='N',
+parser.add_argument('--queue_name', type=str, default="automl", metavar='N',
                     help='queue name')
 args = parser.parse_args()
 
@@ -42,9 +42,9 @@ while not q.empty():
     itemstr = item.decode("utf-8")
     job = json.loads(itemstr)
     print('==================================')
-    print(">>> Working on: " + job.get('model_name'))
+    print(">>> Run name: " + job.get('run_name'))
     train_config, cached_config = get_train_config(
-        job, cached_config, automl=False)
+        job, cached_config, automl=True)
     train_model(train_config)
     # cmd = f"python3 ./train.py --model_name={job['model_name']} --num_epochs={job['num_epochs']} --dataset_url={job['dataset_url']} --num_classes={job['num_classes']}"
     # os.system(cmd)

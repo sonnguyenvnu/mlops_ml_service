@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: push-job-{{ experiment_name }}
+  namespace: kubeflow
+spec:
+  ttlSecondsAfterFinished: 10
+  template:
+    metadata:
+      name: push-job-{{ experiment_name }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: push-job-container
+          image: python:3.8.16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip3 install redis argparse
+              echo "Pushing jobs to queue..."
+              python3 /mnt/job_pretrained.py \
+              --redis_host=redis \
+              --queue_name=job2 \
+              --dataset_url={{ dataset_url }} \
+              --num_epochs=100 \
+              --num_classes={{ num_classes }} \
+              --target_size={{ target_size }}
+          volumeMounts:
+            - name: volume-pvc
+              mountPath: "/mnt"
+      volumes:
+        - name: volume-pvc
+          persistentVolumeClaim:
+            claimName: ml-service-pvc

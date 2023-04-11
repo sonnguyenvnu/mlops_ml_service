@@ -11,9 +11,8 @@ import numpy as np
 AUTOTUNE = tf.data.AUTOTUNE
 
 
-def get_tpu_config(train_config={}):
-    # TPU_ADDR = os.getenv('KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS')
-    TPU_ADDR = 'tpu-node-1'
+def get_tpu_config(train_config={}, automl=False):
+    TPU_ADDR = os.getenv('KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS')
     try:
         tpu = tf.distribute.cluster_resolver.TPUClusterResolver(TPU_ADDR)
         print('Running on TPU ', tpu.cluster_spec().as_dict()['worker'])
@@ -36,7 +35,10 @@ def get_tpu_config(train_config={}):
         print('Mixed precision enabled')
 
     if strategy.num_replicas_in_sync == 8:
-        BATCH_SIZE = 16 * strategy.num_replicas_in_sync
+        if automl:
+            BATCH_SIZE = 32
+        else:
+            BATCH_SIZE = 16 * strategy.num_replicas_in_sync
     elif strategy.num_replicas_in_sync == 1:
         BATCH_SIZE = 16
     else:
@@ -96,13 +98,20 @@ def data_augment(image, one_hot_class):
     image = tf.image.random_saturation(image, 0, 2)
     return image, one_hot_class
 
+# train config for both pre-trained models and automl
 
-def get_train_config(metadata, cached_config={}):
+
+def get_train_config(metadata, cached_config={}, automl=False):
     config = cached_config.get(metadata.get('dataset_url'))
     if config is not None:
         print('>>> Received train config from cache, key:',
               metadata.get('dataset_url'))
         config['model_name'] = metadata.get('model_name')
+
+        # for automl
+        config['run_name'] = metadata.get('run_name')
+        config['architecture'] = metadata.get('architecture')
+        config['nn_config'] = metadata.get('nn_config')
         return config, cached_config
 
     dataset_url = metadata.get('dataset_url')
@@ -110,7 +119,7 @@ def get_train_config(metadata, cached_config={}):
     num_classes = metadata.get('num_classes')
     IMAGE_SIZE = [target_size, target_size]
 
-    train_config = get_tpu_config()
+    train_config = get_tpu_config(automl=automl)
     train_config['dataset_url'] = dataset_url
     train_config['target_size'] = target_size
     train_config['num_classes'] = num_classes
@@ -119,12 +128,17 @@ def get_train_config(metadata, cached_config={}):
     train_config['image_size'] = IMAGE_SIZE
     BATCH_SIZE = train_config.get('batch_size')
 
+    # for automl
+    train_config['run_name'] = metadata.get('run_name')
+    train_config['architecture'] = metadata.get('architecture')
+    train_config['nn_config'] = metadata.get('nn_config')
+
     validation_split = 0.2
     filenames = tf.io.gfile.glob(dataset_url)
     num_images = count_data_items(filenames)
     train_images = int(num_images * 0.8)
     print('Train images:', train_images)
-    TRAIN_STEPS = train_images // BATCH_SIZE
+    TRAIN_STEPS = int(train_images // BATCH_SIZE) + 1
 
     train_config['steps_per_epoch'] = TRAIN_STEPS
     print('Train steps:', TRAIN_STEPS)
@@ -136,7 +150,7 @@ def get_train_config(metadata, cached_config={}):
     train_dataset = train_dataset.map(
         data_augment, num_parallel_calls=AUTOTUNE)
     train_dataset = train_dataset.repeat()
-    train_dataset = train_dataset.shuffle(2048)
+    # train_dataset = train_dataset.shuffle(2048)
     train_dataset = train_dataset.batch(BATCH_SIZE)
     train_dataset = train_dataset.prefetch(AUTOTUNE)
 

@@ -7,6 +7,8 @@ import tensorflow as tf
 import numpy as np
 import rediswq
 import mlflow
+from tensorflow.keras.callbacks import ModelCheckpoint
+from ModelConstructor import ModelConstructor
 
 
 def find_argmax_by_attr(lst, attr):
@@ -22,25 +24,12 @@ def find_argmax_by_attr(lst, attr):
     return max_idx, max_val, max_obj
 
 
-def create_model(pretrained_model_name, num_classes, image_size):
-    model_fn = getattr(tf.keras.applications, pretrained_model_name)
-    pretrained_model = model_fn(weights='imagenet', input_shape=[
-                                *image_size, 3], include_top=False)
-
-    pretrained_model.trainable = True
-
-    model = tf.keras.Sequential([
-        pretrained_model,
-        tf.keras.layers.GlobalAveragePooling2D(),
-        tf.keras.layers.Dense(
-            num_classes, activation='softmax', dtype=tf.float32)
-    ])
-
-    model.compile(
-        optimizer='adam',
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
+def create_model(arc_json, nn_json):
+    constructor = ModelConstructor(arc_json, nn_json)
+    model = constructor.build_model()
+    model.compile(loss=tf.keras.losses.categorical_crossentropy,
+                  optimizer='adam',
+                  metrics=['accuracy'])
 
     return model
 
@@ -54,24 +43,29 @@ def train_model(train_config):
     val_dataset = train_config.get('val_dataset')
     batch_size = train_config.get('batch_size')
     steps_per_epoch = train_config.get('steps_per_epoch')
-    model_name = train_config.get('model_name')
     image_size = train_config.get('image_size')
     num_classes = train_config.get('num_classes')
     num_epochs = train_config.get('num_epochs')
     patience = num_epochs // 5
+
+    run_name = train_config.get('run_name')
+    architecture = train_config.get('architecture')
+    nn_config = train_config.get('nn_config')
     print(
-        f">>> Transfer learning with pretrained model: {model_name}, {num_epochs} epochs, {num_classes} classes, dataset_url: {train_config.get('dataset_url')}")
+        f">>> Running AutoML with params: architecture => {architecture}, nn_config: {nn_config}")
 
     with strategy.scope():
-        model = create_model(model_name, num_classes, image_size)
+        model = create_model(architecture, nn_config)
         model.summary()
 
         client = mlflow.MlflowClient()
         mlflow.start_run()
+
+        # mlflow.log_param('arch', architecture)
+        # mlflow.log_param('nn_config', nn_config)
         # Set run name
         run_id = mlflow.active_run().info.run_id
-        mlflow.set_tag("mlflow.runName",
-                       f"{experiment_name}_pretrained_{model_name}")
+        mlflow.set_tag("mlflow.runName", run_name)
 
         checkpoint_path = f"gs://{model_dir}/{experiment_name}/{run_id}"
         checkpoint_callback = ModelCheckpoint(
@@ -82,7 +76,7 @@ def train_model(train_config):
             print("\nEpoch {}/{}".format(e + 1, num_epochs))
             history = model.fit(train_dataset,
                                 steps_per_epoch=steps_per_epoch,
-                                epochs=1, verbose=1, batch_size=batch_size,
+                                epochs=1, verbose=1, batch_size=32,
                                 validation_data=val_dataset, callbacks=[checkpoint_callback])
 
             metrics = {
