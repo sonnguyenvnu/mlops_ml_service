@@ -8,9 +8,9 @@ from op_library import concat, conv, sp_conv, dw_conv, reduction
 
 
 class ModelConstructor(object):
-    def __init__(self, arc_json, nn_json):
-        self.arch = json.loads(arc_json)
-        nn_config = json.loads(nn_json)
+    def __init__(self, arch_value, nn_config_value):
+        self.arch = arch_value
+        nn_config = nn_config_value
         self.num_layers = nn_config['num_layers']
         self.input_sizes = nn_config['input_sizes']
         self.output_size = nn_config['output_sizes'][-1]

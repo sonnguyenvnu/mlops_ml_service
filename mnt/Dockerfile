@@ -8,6 +8,4 @@ RUN pip3 install redis mlflow==2.2.2 argparse
 
 VOLUME /app
 
-COPY . .
-
 CMD sleep 10000

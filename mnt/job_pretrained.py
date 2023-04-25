@@ -19,8 +19,12 @@ parser.add_argument('--target_size', type=int, default=224, metavar='N',
 args = parser.parse_args()
 print('>>> Args:', args)
 
-pretrained_models = ['Xception', 'MobileNetV2', 'VGG16', 'VGG19', 'ResNet50', 'EfficientNetB0', 'EfficientNetB1',
-                     'EfficientNetB2', 'EfficientNetB3']
+pretrained_models = ['MobileNetV2', 'MobileNet', 'NASNetMobile', 'EfficientNetB0', 'EfficientNetV2B0', 'EfficientNetB1',
+                     'DenseNet121', 'EfficientNetV2B1', 'EfficientNetB2', 'EfficientNetV2B2', 'EfficientNetB3', 'DenseNet169', 'EfficientNetV2B3',
+                     'EfficientNetB4', 'DenseNet201', 'EfficientNetV2S', 'Xception', 'InceptionV3', 'ResNet50V2', 'ResNet50', 'ConvNeXtTiny',
+                     'EfficientNetB5', 'EfficientNetB6', 'ResNet101V2', 'ResNet101', 'ConvNeXtSmall', 'EfficientNetV2M', 'InceptionResNetV2',
+                     'ResNet152V2', 'ResNet152', 'EfficientNetB7', 'ConvNeXtBase', 'NASNetLarge', 'EfficientNetV2L', 'VGG16', 'VGG19',
+                     'ConvNeXtLarge', 'ConvNeXtXLarge']
 
 
 def create_train_jobs(args):

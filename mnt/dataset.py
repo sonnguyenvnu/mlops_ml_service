@@ -1,7 +1,12 @@
 import math
 import argparse
+import os
 import numpy as np
 import tensorflow as tf
+import requests
+
+TPU_ADDR = os.getenv('KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS')
+print('Connecting to TPU: ', TPU_ADDR)
 
 parser = argparse.ArgumentParser(description='Create TFRecord dataset')
 parser.add_argument('--gcs_folder', type=str, default="", metavar='N',
@@ -11,6 +16,10 @@ parser.add_argument('--gcs_output', type=str, default="", metavar='N',
 parser.add_argument('--classes', default=[], nargs='*')
 parser.add_argument('--target_size', type=int, default=224, metavar='N',
                     help='Target size')
+parser.add_argument('--experiment_name', type=str, default='', metavar='N',
+                    help='experiment name')
+parser.add_argument('--project_id', type=str, default='', metavar='N',
+                    help='project id in mongoose')
 
 args = parser.parse_args()
 # Pay attention to the classes parameter
@@ -189,7 +198,7 @@ def write_tfrecord_dataset():
 
 
 try:
-    tpu = tf.distribute.cluster_resolver.TPUClusterResolver.connect()
+    tpu = tf.distribute.cluster_resolver.TPUClusterResolver.connect(TPU_ADDR)
     strategy = tf.distribute.TPUStrategy(tpu)
 except ValueError:
     strategy = tf.distribute.MirroredStrategy()
@@ -206,5 +215,13 @@ if MIXED_PRECISION:
     print('Mixed precision enabled')
 with strategy.scope():
     write_tfrecord_dataset()
+
+# Send notify to BE
+url = f"{os.getenv('BACKEND_SERVICE_HOST')}/v1/experiments"
+data = {'experiment_name': args.experiment_name, 'project_id': args.project_id}
+print('payload', data)
+
+response = requests.post(url, data=data)
+print('Response status code: ', response.status_code)
 
 # python3 dataset.py --gcs_folder=gs://uet-mlops/images/641ac7fd897b5152aaa371e9 --gcs_output=gs://uet-mlops/flowers/ --target_size=224 --classes ants bees
