@@ -28,11 +28,12 @@ args = parser.parse_args()
 arch = args.architecture.replace("\'", "\"")
 print(">>> arch received by trial")
 print(arch)
+arch_value = json.loads(arch)
 
 nn_config = args.nn_config.replace("\'", "\"")
-nn_config_param = json.loads(nn_config)
 print(">>> nn_config received by trial")
 print(nn_config)
+nn_config_value = json.loads(nn_config)
 
 redis_host = os.getenv('REDIS_SERVICE_HOST')
 queue_name = os.getenv('QUEUE_NAME')
@@ -44,11 +45,11 @@ print("Worker with sessionID: " + q.sessionID())
 print("Pushing job to queue...")
 
 time_str = str(int(time.time()))
-run_name = f"{experiment_name}_{nn_config_param.get('num_layers')}_layers_{time_str}"
+run_name = f"{experiment_name}_automl_{time_str}"
 job = json.dumps({
     'run_name': run_name,
-    'architecture': arch,
-    'nn_config': nn_config,
+    'architecture': arch_value,
+    'nn_config': nn_config_value,
     'num_epochs': args.num_epochs,
     'target_size': args.target_size,
     'dataset_url': args.dataset_url,

@@ -1,0 +1,13 @@
+version: "3.3"
+
+services:
+  predictor:
+    # container_name: predictor-container
+    image: mailnophone03/deployment:latest
+    ports:
+      - 4000:4000
+    environment: 
+      GOOGLE_APPLICATION_CREDENTIALS: ./service-account-gcs.json
+      MODEL_DIR: {{ model_dir }}
+      CLASSES: {{ classes }}
+      TARGET_SIZE: {{ target_size }}

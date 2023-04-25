@@ -7,6 +7,7 @@ import tensorflow as tf
 import numpy as np
 import rediswq
 import mlflow
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 
 def find_argmax_by_attr(lst, attr):

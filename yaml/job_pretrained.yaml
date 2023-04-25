@@ -2,9 +2,10 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: training
+  namespace: kubeflow
 spec:
   parallelism: 2
-  # ttlSecondsAfterFinished: 100
+  ttlSecondsAfterFinished: 60
   template:
     metadata:
       name: training
@@ -21,8 +22,8 @@ spec:
         - /bin/sh
         - -c
         - |
-          apt update && apt install git -y
-          pip install redis argparse google-cloud-storage mlflow==2.2.2
+          apt-get update && apt-get install git -y
+          pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
           cd /tf/notebooks
           python3 worker.py --redis_host=redis --queue_name=job2
         volumeMounts:
@@ -44,13 +45,17 @@ spec:
               secretKeyRef:
                 name: mlflow-secret
                 key: password
+          - name: MLFLOW_EXPERIMENT_NAME
+            value: example_experiment
           - name: GOOGLE_APPLICATION_CREDENTIALS
             valueFrom:
               secretKeyRef:
                 name: mlflow-secret
                 key: credential-file
           - name: REDIS_SERVICE_HOST
-            value: "redis"
+            value: redis
+          - name: MODEL_DIR
+            value: uet-mlflow
       volumes:
       - name: ml-service
         persistentVolumeClaim:

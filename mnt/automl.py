@@ -52,7 +52,7 @@ def train_model(train_config):
     architecture = train_config.get('architecture')
     nn_config = train_config.get('nn_config')
     print(
-        f">>> Running AutoML with params: architecture => {architecture}, nn_config: {nn_config}")
+        f">>> Running AutoML with params: architecture: {architecture}, nn_config: {nn_config}")
 
     with strategy.scope():
         model = create_model(architecture, nn_config)

@@ -36,7 +36,7 @@ def get_tpu_config(train_config={}, automl=False):
 
     if strategy.num_replicas_in_sync == 8:
         if automl:
-            BATCH_SIZE = 32
+            BATCH_SIZE = 16
         else:
             BATCH_SIZE = 16 * strategy.num_replicas_in_sync
     elif strategy.num_replicas_in_sync == 1:
@@ -90,11 +90,12 @@ def load_dataset(filenames, num_classes, image_size):
 
     return dataset
 
-# TODO: Implement more aug
-
 
 def data_augment(image, one_hot_class):
     image = tf.image.random_flip_left_right(image)
+    image = tf.image.random_brightness(image, max_delta=0.2)
+    image = tf.image.random_contrast(image, lower=0.5, upper=1.5)
+    image = tf.image.random_hue(image, max_delta=0.2)
     image = tf.image.random_saturation(image, 0, 2)
     return image, one_hot_class
 

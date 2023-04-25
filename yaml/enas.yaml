@@ -1,20 +1,10 @@
----
-# This CPU example aims to show all the possible operations
-# is not very likely to get good result due to the extensive search space
-
-# In practice, setting up a limited search space with more common operations is more likely to get better performance.
-# For example, Efficient Neural Architecture Search via Parameter Sharing (https://arxiv.org/abs/1802.03268)
-# uses only 6 operations, 3x3/5x5 convolution, 3x3/5x5 separable_convolution and 3x3 max_pooling/avg_pooling.
-
-# It uses only 1 layer of CNN and 1 train epoch to show CPU support and it has very bad results.
-# In practice, if you increase number of layers, training process on CPU will take more time.
 apiVersion: kubeflow.org/v1beta1
 kind: Experiment
 metadata:
   namespace: kubeflow
   name: enas-cpu
 spec:
-  parallelTrialCount: 2
+  parallelTrialCount: 5
   maxTrialCount: 20
   maxFailedTrialCount: 10
   objective:
@@ -25,13 +15,13 @@ spec:
     algorithmName: enas
   nasConfig:
     graphConfig:
-      numLayers: 1
+      numLayers: 10
       inputSizes:
-        - 10
-        - 10
+        - 224
+        - 224
         - 3
       outputSizes:
-        - 10
+        - 5
     operations:
       - operationType: convolution
         parameters:
@@ -143,16 +133,18 @@ spec:
             containers:
               - name: training-container
                 image: mailnophone03/automl:katib
-                imagePullPolicy: Always
                 command:
                   - python3
                   - -u
-                  - RunTrial.py
+                  - /app/RunTrial.py
                   - --num_epochs=100
                   - --architecture="${trialParameters.neuralNetworkArchitecture}"
                   - --nn_config="${trialParameters.neuralNetworkConfig}"
-                  - --dataset_url=gs://uet-mlops/antsbees/*.tfrec
+                  - --dataset_url=gs://uet-mlops/flowers/*.tfrec
                   - --target_size=224
+                volumeMounts:
+                  - mountPath: /app
+                    name: ml-service
                 env:
                 - name: REDIS_SERVICE_HOST
                   value: "redis"
@@ -180,4 +172,8 @@ spec:
                     secretKeyRef:
                       name: mlflow-secret
                       key: credential-file
+            volumes:
+              - name: ml-service
+                persistentVolumeClaim:
+                  claimName: ml-service-pvc
             restartPolicy: Never

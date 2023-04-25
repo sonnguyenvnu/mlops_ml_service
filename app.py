@@ -9,61 +9,108 @@ from jinja2 import Template
 app = Flask(__name__)
 CORS(app)
 
+
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
 
-@app.route('/clf/train', methods=['GET'])
-def train_model():
-    # host = os.getenv('REDIS_ADDR')
-    # host = 'redis'
-    # queue_name = "job2"
-    # create_train_jobs(host, queue_name)
-    os.system(f"kubectl apply -f ./yaml/push.yaml &")
-    os.system(f"kubectl apply -f ./yaml/job_pretrained.yaml &")
-    return {'message': 'Training in progress'}, 202
+# @app.route('/clf/train', methods=['GET'])
+# def train_model():
+#     # host = os.getenv('REDIS_ADDR')
+#     # host = 'redis'
+#     # queue_name = "job2"
+#     # create_train_jobs(host, queue_name)
+#     os.system(f"kubectl apply -f ./yaml/redis.yaml &")
+#     os.system(f"kubectl apply -f ./yaml/push.yaml &")
+#     os.system(f"kubectl apply -f ./yaml/job_pretrained.yaml &")
+#     os.system(f"kubectl apply -f ./yaml/enas.yaml &")
+#     os.system(f"kubectl apply -f ./yaml/job_automl.yaml &")
+#     return {'message': 'Training in progress'}, 202
+
+
+@app.route('/clf/stop', methods=['GET'])
+def stop_train():
+    os.system(f"kubectl delete -f ./yaml/push.yaml")
+    os.system(f"kubectl delete -f ./yaml/job_pretrained.yaml")
+    os.system(f"kubectl delete -f ./yaml/enas.yaml")
+    os.system(f"kubectl delete -f ./yaml/job_automl.yaml")
+    os.system(f"kubectl delete -f ./yaml/redis.yaml")
+    return {'message': 'Training stopped'}, 202
+
 
 def get_template_file(path):
     with open(path, 'r', encoding='UTF-8') as file:
         return file.read()
 
+
 def save_file(content, dst_path):
     with open(dst_path, 'w', encoding='UTF-8') as file:
         file.write(content)
 
-@app.route('/train', methods=['POST'])
-def render():
+
+@app.route('/clf/train', methods=['POST'])
+def train():
     data = request.json
     classes_str = ' '.join(data.get('classes'))
     data['classes'] = classes_str
+    print(data)
 
-    dataset_template = get_template_file('./templates/dataset.template.yaml')
-    train_template = get_template_file('./templates/train.template.yaml')
+    pretrained_template = get_template_file(
+        './templates/pretrained.template.yaml')
+    enas_template = get_template_file('./templates/enas.template.yaml')
+    automl_template = get_template_file('./templates/automl.template.yaml')
     push_job_template = get_template_file(
         './templates/push_job_pretrained.template.yaml')
-
-    jinja2_template = Template(dataset_template)
-    content = jinja2_template.render(data)
-    dst_path = f"./dataset_{data.get('experiment_name')}.yaml"
-    save_file(content, dst_path)
-
-    jinja2_template = Template(train_template)
-    content = jinja2_template.render(data)
-    dst_path = f"./train_{data.get('experiment_name')}.yaml"
-    save_file(content, dst_path)
 
     jinja2_template = Template(push_job_template)
     content = jinja2_template.render(data)
     dst_path = f"./push_job_pretrained_{data.get('experiment_name')}.yaml"
     save_file(content, dst_path)
+    os.system(f"kubectl apply -f {dst_path} &")
 
-    return 'Done'
+    template = Template(pretrained_template)
+    content = template.render(data)
 
-@app.route('/deploy', methods=['POST'])
-def deploy():
+    template = Template(enas_template)
+    # 5 to 20 layers
+    for i in range(4, 21):
+        data['num_layers'] = i
+        content += template.render(data)
+    dst_path = f"./train_{data.get('experiment_name')}.yaml"
+
+    template = Template(automl_template)
+    content = template.render(data)
+
+    save_file(content, dst_path)
+    os.system(f"kubectl apply -f {dst_path} &")
+    return {'status': 'OK'}
+
+
+@app.route('/clf/dataset', methods=['POST'])
+def write_dataset():
     data = request.json
-    classes_str = ' '.join(data.get('classes'))
-    data['classes'] = classes_str
+    data['classes'] = ' '.join(data.get('classes'))
+
+    dataset_template = get_template_file('./templates/dataset.template.yaml')
+    jinja2_template = Template(dataset_template)
+    content = jinja2_template.render(data)
+    dst_path = f"./dataset_{data.get('experiment_name')}.yaml"
+    save_file(content, dst_path)
+    os.system(f"kubectl apply -f {dst_path} &")
+    return {'status': 'OK'}
+
+
+@app.route('/clf/deploy', methods=['GET'])
+def deploy():
+    # data = request.json
+    # classes_str = ' '.join(data.get('classes'))
+    # data['classes'] = classes_str
+    data = {
+        'classes': 'daisy dandelion roses sunflowers tulips',
+        'target_size': 224,
+        'model_dir': 'gs://uet-mlflow/example_experiment/06d964a0070f45709edcfabb9854fd62/models/ckpt_epoch_7',
+        'experiment_name': 'kashuiyweiruiw',
+    }
 
     deploy_template = get_template_file(
         './templates/docker-compose.template.yaml')
@@ -74,6 +121,7 @@ def deploy():
     os.system(f"docker-compose -f {dst_path} up -d --force-recreate --build")
 
     return {'status': 'OK'}
+
 
 if __name__ == '__main__':
     app.run(port=4000)
