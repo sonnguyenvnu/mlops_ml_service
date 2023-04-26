@@ -1,74 +1,12 @@
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: training-pretrained-{{ experiment_name }}
-  namespace: kubeflow
-spec:
-  parallelism: 2
-  ttlSecondsAfterFinished: 60
-  template:
-    metadata:
-      name: training-pretrained-{{ experiment_name }}
-      annotations:
-        tf-version.cloud-tpus.google.com: "2.11.0"
-    spec:
-      containers:
-      - name: training-container
-        image: tensorflow/tensorflow:2.11.0
-        resources:
-          limits:
-            cloud-tpus.google.com/preemptible-v2: 8
-        command:
-        - /bin/sh
-        - -c
-        - |
-          apt-get update && apt-get install git -y
-          pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
-          cd /tf/notebooks
-          python3 worker.py --redis_host=redis --queue_name=job2
-        volumeMounts:
-        - mountPath: "/tf/notebooks"
-          name: ml-service
-        env:
-          - name: MLFLOW_TRACKING_URI
-            valueFrom:
-              secretKeyRef:
-                name: mlflow-secret
-                key: uri
-          - name: MLFLOW_TRACKING_USERNAME
-            valueFrom:
-              secretKeyRef:
-                name: mlflow-secret
-                key: username
-          - name: MLFLOW_TRACKING_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: mlflow-secret
-                key: password
-          - name: MLFLOW_EXPERIMENT_NAME
-            value: example_experiment
-          - name: GOOGLE_APPLICATION_CREDENTIALS
-            valueFrom:
-              secretKeyRef:
-                name: mlflow-secret
-                key: credential-file
-          - name: REDIS_SERVICE_HOST
-            value: redis
-          - name: MODEL_DIR
-            value: uet-mlflow
-      volumes:
-      - name: ml-service
-        persistentVolumeClaim:
-          claimName: ml-service-pvc
-      restartPolicy: OnFailure
+
 ---
 apiVersion: kubeflow.org/v1beta1
 kind: Experiment
 metadata:
   namespace: kubeflow
-  name: nas-{{ experiment_name }}
+  name: nas-{{ experiment_name }}-{{ num_layers }}
 spec:
-  parallelTrialCount: 5
+  parallelTrialCount: 2
   maxTrialCount: 20
   maxFailedTrialCount: 10
   objective:
@@ -79,7 +17,7 @@ spec:
     algorithmName: enas
   nasConfig:
     graphConfig:
-      numLayers: 20
+      numLayers: {{ num_layers }}
       inputSizes:
         - {{ target_size }}
         - {{ target_size }}
@@ -197,7 +135,6 @@ spec:
             containers:
               - name: training-container
                 image: mailnophone03/automl:katib
-                imagePullPolicy: Always
                 command:
                   - python3
                   - -u
@@ -207,6 +144,9 @@ spec:
                   - --nn_config="${trialParameters.neuralNetworkConfig}"
                   - --dataset_url={{ dataset_url }}
                   - --target_size={{ target_size }}
+                volumeMounts:
+                - mountPath: /app
+                  name: ml-service-enas
                 env:
                 - name: REDIS_SERVICE_HOST
                   value: "redis"
@@ -228,10 +168,14 @@ spec:
                       name: mlflow-secret
                       key: password
                 - name: MLFLOW_EXPERIMENT_NAME
-                  value: example_experiment
+                  value: {{ experiment_name }}
                 - name: GOOGLE_APPLICATION_CREDENTIALS
                   valueFrom:
                     secretKeyRef:
                       name: mlflow-secret
                       key: credential-file
+            volumes:
+            - name: ml-service-enas
+              persistentVolumeClaim:
+                claimName: ml-service-pvc
             restartPolicy: Never

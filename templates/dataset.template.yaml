@@ -1,19 +1,18 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: training-automl
+  name: write-dataset-{{ experiment_name }}
   namespace: kubeflow
 spec:
-  parallelism: 2
-  ttlSecondsAfterFinished: 60
+  ttlSecondsAfterFinished: 100
   template:
     metadata:
-      name: training-automl
+      name: write-dataset-{{ experiment_name }}
       annotations:
         tf-version.cloud-tpus.google.com: "2.11.0"
     spec:
       containers:
-      - name: training-container
+      - name: write-dataset-container
         image: tensorflow/tensorflow:2.11.0
         resources:
           limits:
@@ -22,13 +21,18 @@ spec:
         - /bin/sh
         - -c
         - |
-          apt-get update && apt-get install git -y
-          pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
+          pip install argparse
           cd /tf/notebooks
-          python3 worker_automl.py --redis_host=redis --queue_name=automl
+          python3 dataset.py \
+          --gcs_folder={{ gcs_folder }} \
+          --gcs_output={{ gcs_output }} \
+          --target_size={{ target_size }} \
+          --experiment_name={{ experiment_name }} \
+          --project_id={{ project_id }} \
+          --classes {{ classes }}
         volumeMounts:
         - mountPath: "/tf/notebooks"
-          name: ml-service
+          name: ml-service-dataset
         env:
           - name: MLFLOW_TRACKING_URI
             valueFrom:
@@ -45,19 +49,20 @@ spec:
               secretKeyRef:
                 name: mlflow-secret
                 key: password
-          - name: MLFLOW_EXPERIMENT_NAME
-            value: example_experiment
           - name: GOOGLE_APPLICATION_CREDENTIALS
             valueFrom:
               secretKeyRef:
                 name: mlflow-secret
                 key: credential-file
+          - name: BACKEND_SERVICE_HOST
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: backend-service
           - name: REDIS_SERVICE_HOST
-            value: redis
-          - name: MODEL_DIR
-            value: pixelbrain
+            value: "redis"
       volumes:
-      - name: ml-service
+      - name: ml-service-dataset
         persistentVolumeClaim:
           claimName: ml-service-pvc
       restartPolicy: OnFailure

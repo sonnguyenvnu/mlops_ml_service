@@ -9,10 +9,10 @@ spec:
   accessModes:
     - ReadWriteOnce
   claimRef:
-    namespace: default
+    namespace: kubeflow
     name: ml-service-pvc
   gcePersistentDisk:
-    pdName: gke-pv
+    pdName: gke-pv-2
     fsType: ext4
 ---
 apiVersion: v1

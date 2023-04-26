@@ -1,14 +1,16 @@
+
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: training-automl
+  name: training-pretrained-{{ experiment_name }}
   namespace: kubeflow
 spec:
   parallelism: 2
   ttlSecondsAfterFinished: 60
   template:
     metadata:
-      name: training-automl
+      name: training-pretrained-{{ experiment_name }}
       annotations:
         tf-version.cloud-tpus.google.com: "2.11.0"
     spec:
@@ -25,10 +27,10 @@ spec:
           apt-get update && apt-get install git -y
           pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
           cd /tf/notebooks
-          python3 worker_automl.py --redis_host=redis --queue_name=automl
+          python3 worker.py --redis_host=redis --queue_name=job2
         volumeMounts:
         - mountPath: "/tf/notebooks"
-          name: ml-service
+          name: ml-service-pretrained
         env:
           - name: MLFLOW_TRACKING_URI
             valueFrom:
@@ -46,7 +48,7 @@ spec:
                 name: mlflow-secret
                 key: password
           - name: MLFLOW_EXPERIMENT_NAME
-            value: example_experiment
+            value: {{ experiment_name }}
           - name: GOOGLE_APPLICATION_CREDENTIALS
             valueFrom:
               secretKeyRef:
@@ -55,9 +57,9 @@ spec:
           - name: REDIS_SERVICE_HOST
             value: redis
           - name: MODEL_DIR
-            value: pixelbrain
+            value: uet-mlflow
       volumes:
-      - name: ml-service
+      - name: ml-service-pretrained
         persistentVolumeClaim:
           claimName: ml-service-pvc
       restartPolicy: OnFailure

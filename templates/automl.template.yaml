@@ -1,18 +1,21 @@
+
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: write-dataset-{{ experiment_name }}
+  name: training-automl-{{ experiment_name }}
   namespace: kubeflow
 spec:
-  ttlSecondsAfterFinished: 100
+  parallelism: 2
+  ttlSecondsAfterFinished: 60
   template:
     metadata:
-      name: write-dataset-{{ experiment_name }}
+      name: training-automl-{{ experiment_name }}
       annotations:
         tf-version.cloud-tpus.google.com: "2.11.0"
     spec:
       containers:
-      - name: write-dataset-container
+      - name: training-container
         image: tensorflow/tensorflow:2.11.0
         resources:
           limits:
@@ -21,16 +24,13 @@ spec:
         - /bin/sh
         - -c
         - |
-          pip install argparse
+          apt-get update && apt-get install git -y
+          pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
           cd /tf/notebooks
-          python3 dataset.py \
-          --gcs_folder={{ gcs_folder }} \
-          --gcs_output={{ gcs_output }} \
-          --target_size={{ target_size }} \
-          --classes {{ classes }}
+          python3 worker_automl.py --redis_host=redis --queue_name=automl
         volumeMounts:
         - mountPath: "/tf/notebooks"
-          name: ml-service
+          name: ml-service-automl
         env:
           - name: MLFLOW_TRACKING_URI
             valueFrom:
@@ -47,15 +47,19 @@ spec:
               secretKeyRef:
                 name: mlflow-secret
                 key: password
+          - name: MLFLOW_EXPERIMENT_NAME
+            value: {{ experiment_name }}
           - name: GOOGLE_APPLICATION_CREDENTIALS
             valueFrom:
               secretKeyRef:
                 name: mlflow-secret
                 key: credential-file
           - name: REDIS_SERVICE_HOST
-            value: "redis"
+            value: redis
+          - name: MODEL_DIR
+            value: pixelbrain
       volumes:
-      - name: ml-service
+      - name: ml-service-automl
         persistentVolumeClaim:
           claimName: ml-service-pvc
       restartPolicy: OnFailure

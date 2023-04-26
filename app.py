@@ -3,7 +3,6 @@ import json
 import time
 from flask import Flask, request
 from flask_cors import CORS
-import rediswq
 from jinja2 import Template
 
 app = Flask(__name__)
@@ -73,13 +72,13 @@ def train():
 
     template = Template(enas_template)
     # 5 to 20 layers
-    for i in range(4, 21):
+    for i in range(4, 5):
         data['num_layers'] = i
         content += template.render(data)
     dst_path = f"./train_{data.get('experiment_name')}.yaml"
 
     template = Template(automl_template)
-    content = template.render(data)
+    content += template.render(data)
 
     save_file(content, dst_path)
     os.system(f"kubectl apply -f {dst_path} &")

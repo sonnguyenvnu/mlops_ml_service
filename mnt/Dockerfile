@@ -1,11 +1,8 @@
-FROM python:3.10.8-slim
-
-RUN mkdir /app
-WORKDIR /app
+FROM tensorflow/tensorflow:2.11.0
 
 RUN apt-get update && apt-get install git -y
-RUN pip3 install redis mlflow==2.2.2 argparse
+RUN pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
 
-VOLUME /app
+COPY . /tf/notebooks
 
 CMD sleep 10000
