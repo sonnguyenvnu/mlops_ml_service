@@ -13,7 +13,8 @@ spec:
     spec:
       containers:
       - name: write-dataset-container
-        image: tensorflow/tensorflow:2.11.0
+        image: mailnophone03/mlops:latest
+        imagePullPolicy: Always
         resources:
           limits:
             cloud-tpus.google.com/preemptible-v2: 8
@@ -21,18 +22,13 @@ spec:
         - /bin/sh
         - -c
         - |
-          pip install argparse
-          cd /tf/notebooks
-          python3 dataset.py \
+          python3 /tf/notebooks/dataset.py \
           --gcs_folder={{ gcs_folder }} \
           --gcs_output={{ gcs_output }} \
           --target_size={{ target_size }} \
           --experiment_name={{ experiment_name }} \
           --project_id={{ project_id }} \
           --classes {{ classes }}
-        volumeMounts:
-        - mountPath: "/tf/notebooks"
-          name: ml-service-dataset
         env:
           - name: MLFLOW_TRACKING_URI
             valueFrom:
@@ -61,8 +57,4 @@ spec:
                 key: backend-service
           - name: REDIS_SERVICE_HOST
             value: "redis"
-      volumes:
-      - name: ml-service-dataset
-        persistentVolumeClaim:
-          claimName: ml-service-pvc
       restartPolicy: OnFailure

@@ -134,19 +134,17 @@ spec:
           spec:
             containers:
               - name: training-container
-                image: mailnophone03/automl:katib
+                image: mailnophone03/mlops:latest
+                imagePullPolicy: Always
                 command:
                   - python3
                   - -u
-                  - RunTrial.py
+                  - /tf/notebooks/RunTrial.py
                   - --num_epochs=100
                   - --architecture="${trialParameters.neuralNetworkArchitecture}"
                   - --nn_config="${trialParameters.neuralNetworkConfig}"
                   - --dataset_url={{ dataset_url }}
                   - --target_size={{ target_size }}
-                volumeMounts:
-                - mountPath: /app
-                  name: ml-service-enas
                 env:
                 - name: REDIS_SERVICE_HOST
                   value: "redis"
@@ -174,8 +172,4 @@ spec:
                     secretKeyRef:
                       name: mlflow-secret
                       key: credential-file
-            volumes:
-            - name: ml-service-enas
-              persistentVolumeClaim:
-                claimName: ml-service-pvc
             restartPolicy: Never

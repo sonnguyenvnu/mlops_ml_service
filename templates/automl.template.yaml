@@ -16,7 +16,8 @@ spec:
     spec:
       containers:
       - name: training-container
-        image: tensorflow/tensorflow:2.11.0
+        image: mailnophone03/mlops:latest
+        imagePullPolicy: Always
         resources:
           limits:
             cloud-tpus.google.com/preemptible-v2: 8
@@ -24,13 +25,7 @@ spec:
         - /bin/sh
         - -c
         - |
-          apt-get update && apt-get install git -y
-          pip install redis cloud-tpu-client google-cloud-storage mlflow==2.2.2
-          cd /tf/notebooks
-          python3 worker_automl.py --redis_host=redis --queue_name=automl
-        volumeMounts:
-        - mountPath: "/tf/notebooks"
-          name: ml-service-automl
+          python3 /tf/notebooks/worker_automl.py --redis_host=redis --queue_name=automl
         env:
           - name: MLFLOW_TRACKING_URI
             valueFrom:
@@ -57,9 +52,5 @@ spec:
           - name: REDIS_SERVICE_HOST
             value: redis
           - name: MODEL_DIR
-            value: pixelbrain
-      volumes:
-      - name: ml-service-automl
-        persistentVolumeClaim:
-          claimName: ml-service-pvc
+            value: pixelbrain/models
       restartPolicy: OnFailure
