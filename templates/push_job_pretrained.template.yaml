@@ -9,7 +9,7 @@ spec:
     metadata:
       name: push-job-{{ experiment_name }}
     spec:
-      restartPolicy: Never
+      restartPolicy: OnFailure
       containers:
         - name: push-job-container
           image: python:3.8.16-alpine
@@ -23,7 +23,7 @@ spec:
               --redis_host=redis \
               --queue_name=job2 \
               --dataset_url={{ dataset_url }} \
-              --num_epochs=100 \
+              --num_epochs=200 \
               --num_classes={{ num_classes }} \
               --target_size={{ target_size }}
           volumeMounts:

@@ -12,7 +12,7 @@ spec:
     namespace: kubeflow
     name: ml-service-pvc
   gcePersistentDisk:
-    pdName: gke-pv-2
+    pdName: gke-pv
     fsType: ext4
 ---
 apiVersion: v1

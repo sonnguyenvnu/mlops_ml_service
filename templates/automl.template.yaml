@@ -49,6 +49,11 @@ spec:
               secretKeyRef:
                 name: mlflow-secret
                 key: credential-file
+          - name: BACKEND_SERVICE_HOST
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: backend-service
           - name: REDIS_SERVICE_HOST
             value: redis
           - name: MODEL_DIR

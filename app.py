@@ -4,6 +4,7 @@ import time
 from flask import Flask, request
 from flask_cors import CORS
 from jinja2 import Template
+from mlflow_client import best_model
 
 app = Flask(__name__)
 CORS(app)
@@ -25,17 +26,6 @@ def hello_world():
 #     os.system(f"kubectl apply -f ./yaml/enas.yaml &")
 #     os.system(f"kubectl apply -f ./yaml/job_automl.yaml &")
 #     return {'message': 'Training in progress'}, 202
-
-
-@app.route('/clf/stop', methods=['GET'])
-def stop_train():
-    os.system(f"kubectl delete -f ./yaml/push.yaml")
-    os.system(f"kubectl delete -f ./yaml/job_pretrained.yaml")
-    os.system(f"kubectl delete -f ./yaml/enas.yaml")
-    os.system(f"kubectl delete -f ./yaml/job_automl.yaml")
-    os.system(f"kubectl delete -f ./yaml/redis.yaml")
-    return {'message': 'Training stopped'}, 202
-
 
 def get_template_file(path):
     with open(path, 'r', encoding='UTF-8') as file:
@@ -70,20 +60,26 @@ def train():
     template = Template(pretrained_template)
     content = template.render(data)
 
-    template = Template(enas_template)
-    # 5 to 20 layers
-    for i in range(4, 5):
-        data['num_layers'] = i
-        content += template.render(data)
+    # template = Template(enas_template)
+    # # 5 to 20 layers
+    # for i in range(4, 5):
+    #     data['num_layers'] = i
+    #     content += template.render(data)
     dst_path = f"./train_{data.get('experiment_name')}.yaml"
 
-    template = Template(automl_template)
-    content += template.render(data)
+    # template = Template(automl_template)
+    # content += template.render(data)
 
     save_file(content, dst_path)
     os.system(f"kubectl apply -f {dst_path} &")
     return {'status': 'OK'}
 
+@app.route('/clf/stop', methods=['GET'])
+def stop_train()
+    experiment_name = request.args.get('experiment_name')
+    os.system(f"kn delete -f ./dataset_{experiment_name}.yaml")
+    os.system(f"kn delete -f ./train_{experiment_name}.yaml")
+    return {'message': 'Training stopped'}
 
 @app.route('/clf/dataset', methods=['POST'])
 def write_dataset():
@@ -121,6 +117,11 @@ def deploy():
 
     return {'status': 'OK'}
 
+@app.route('/models/best', methods=['GET'])
+def best_experiment_model():
+    experiment_name = request.args.get('experiment_name')
+    model = best_model(experiment_name)
+    return model
 
 if __name__ == '__main__':
     app.run(port=4000)

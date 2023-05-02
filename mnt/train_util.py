@@ -3,45 +3,10 @@ import os
 import time
 import argparse
 import re
-import rediswq
-from pretrained import train_model
 import tensorflow as tf
 import numpy as np
 
 AUTOTUNE = tf.data.AUTOTUNE
-
-
-def get_tpu_config(train_config={}, automl=False):
-    TPU_ADDR = os.getenv('KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS')
-    try:
-        tpu = tf.distribute.cluster_resolver.TPUClusterResolver(TPU_ADDR)
-        print('Running on TPU ', tpu.cluster_spec().as_dict()['worker'])
-
-        tf.config.experimental_connect_to_cluster(tpu)
-        tf.tpu.experimental.initialize_tpu_system(tpu)
-        strategy = tf.distribute.TPUStrategy(tpu)
-    except ValueError:
-        strategy = tf.distribute.MirroredStrategy()
-    print("Number of accelerators: ", strategy.num_replicas_in_sync)
-
-    MIXED_PRECISION = False
-    if MIXED_PRECISION:
-        if tpu:
-            policy = tf.keras.mixed_precision.Policy('mixed_bfloat16')
-        else:
-            policy = tf.keras.mixed_precision.Policy('mixed_float16')
-            tf.config.optimizer.set_jit(True)
-        tf.keras.mixed_precision.set_global_policy(policy)
-        print('Mixed precision enabled')
-
-    if automl:
-        BATCH_SIZE = 16
-    else:
-        BATCH_SIZE = 32
-
-    train_config['strategy'] = strategy
-    train_config['batch_size'] = BATCH_SIZE
-    return train_config
 
 def count_data_items(filenames):
     n = [int(re.compile(r"-([0-9]*)\.").search(filename).group(1))
@@ -93,9 +58,56 @@ def data_augment(image, one_hot_class):
     image = tf.image.random_saturation(image, 0, 2)
     return image, one_hot_class
 
+
+def calculate_batch_size(num_images, automl=False):
+    batch_size = 16
+    if not automl:
+        if num_images > 100 and num_images < 500:
+            batch_size = 32
+        if num_images > 500 and num_images < 1000:
+            batch_size = 64
+        if num_images > 1000:
+            batch_size = 128
+    steps_per_epoch = int(num_images // batch_size) + 1
+    print("{} images will be trained with batch size = {}, steps = {}".format(
+        num_images, batch_size, steps_per_epoch))
+    return batch_size, steps_per_epoch
+
+def load_datasets(train_config, automl=False):
+    dataset_url = train_config.get('dataset_url')
+    validation_split = train_config.get('validation_split')
+    num_classes = train_config.get('num_classes')
+    image_size = train_config.get('image_size')
+
+    filenames = tf.io.gfile.glob(dataset_url)
+    num_images = count_data_items(filenames)
+    train_images = int(num_images * (1 - validation_split))
+    train_config['num_images'] = num_images
+    train_config['train_images'] = train_images
+    print('>>> Total images: {}, Train images: {}'.format(num_images, train_images))
+    batch_size, steps_per_epoch = calculate_batch_size(train_images, automl=automl)
+
+    dataset = load_dataset(filenames, num_classes, image_size)
+    train_dataset = dataset.take(train_images)
+    val_dataset = dataset.skip(train_images)
+
+    train_dataset = train_dataset.map(
+        data_augment, num_parallel_calls=AUTOTUNE)
+    train_dataset = train_dataset.repeat()
+    # train_dataset = train_dataset.shuffle(2048)
+    train_dataset = train_dataset.batch(batch_size)
+    train_dataset = train_dataset.prefetch(AUTOTUNE)
+
+    val_dataset = val_dataset.batch(batch_size)
+    val_dataset = val_dataset.prefetch(AUTOTUNE)
+
+    opt = tf.data.Options()
+    opt.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
+    val_dataset = val_dataset.with_options(opt)
+    
+    return train_dataset, val_dataset, batch_size, steps_per_epoch
+
 # train config for both pre-trained models and automl
-
-
 def get_train_config(metadata, cached_config={}, automl=False):
     config = cached_config.get(metadata.get('dataset_url'))
     if config is not None:
@@ -107,6 +119,7 @@ def get_train_config(metadata, cached_config={}, automl=False):
         config['run_name'] = metadata.get('run_name')
         config['architecture'] = metadata.get('architecture')
         config['nn_config'] = metadata.get('nn_config')
+
         return config, cached_config
 
     dataset_url = metadata.get('dataset_url')
@@ -114,50 +127,19 @@ def get_train_config(metadata, cached_config={}, automl=False):
     num_classes = metadata.get('num_classes')
     IMAGE_SIZE = [target_size, target_size]
 
-    train_config = get_tpu_config(automl=automl)
+    train_config = {}
+    train_config['validation_split'] = 0.2
     train_config['dataset_url'] = dataset_url
     train_config['target_size'] = target_size
     train_config['num_classes'] = num_classes
     train_config['num_epochs'] = metadata.get('num_epochs')
     train_config['model_name'] = metadata.get('model_name')
     train_config['image_size'] = IMAGE_SIZE
-    BATCH_SIZE = train_config.get('batch_size')
 
     # for automl
     train_config['run_name'] = metadata.get('run_name')
     train_config['architecture'] = metadata.get('architecture')
     train_config['nn_config'] = metadata.get('nn_config')
-
-    validation_split = 0.2
-    filenames = tf.io.gfile.glob(dataset_url)
-    num_images = count_data_items(filenames)
-    train_images = int(num_images * 0.8)
-    print('Train images:', train_images)
-    TRAIN_STEPS = int(train_images // BATCH_SIZE) + 1
-
-    train_config['steps_per_epoch'] = TRAIN_STEPS
-    print('Train steps:', TRAIN_STEPS)
-
-    dataset = load_dataset(filenames, num_classes, IMAGE_SIZE)
-    train_dataset = dataset.take(train_images)
-    val_dataset = dataset.skip(train_images)
-
-    train_dataset = train_dataset.map(
-        data_augment, num_parallel_calls=AUTOTUNE)
-    train_dataset = train_dataset.repeat()
-    # train_dataset = train_dataset.shuffle(2048)
-    train_dataset = train_dataset.batch(BATCH_SIZE)
-    train_dataset = train_dataset.prefetch(AUTOTUNE)
-
-    val_dataset = val_dataset.batch(BATCH_SIZE)
-    val_dataset = val_dataset.prefetch(AUTOTUNE)
-
-    opt = tf.data.Options()
-    opt.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-    val_dataset = val_dataset.with_options(opt)
-
-    train_config['train_dataset'] = train_dataset
-    train_config['val_dataset'] = val_dataset
 
     cached_config[dataset_url] = train_config
     return train_config, cached_config

@@ -5,6 +5,7 @@ import json
 import time
 import mlflow
 import rediswq
+import requests
 
 # Main
 parser = argparse.ArgumentParser(description='TrainingContainer')
@@ -59,10 +60,6 @@ job = json.dumps({
 q.put(job)
 print('>>> Pushed job to queue. Waiting for train result...')
 
-filter_string = f"tags.mlflow.runName = '{run_name}'"
-client = mlflow.MlflowClient(tracking_uri=os.getenv('MLFLOW_TRACKING_URI'))
-
-
 def find_argmax_by_attr(lst, attr):
     max_val = None
     max_obj = None
@@ -75,36 +72,17 @@ def find_argmax_by_attr(lst, attr):
             max_idx = i
     return max_idx, max_val, max_obj
 
+time.sleep(300) # 5 mins
 
+url = f"{os.getenv('BACKEND_SERVICE_HOST')}/v1/runs?name={run_name}"
 while True:
-    runs = mlflow.search_runs(
-        experiment_names=[experiment_name],
-        filter_string=filter_string,
-        order_by=["metrics.val_accuracy DESC"],
-        run_view_type=mlflow.entities.ViewType.ACTIVE_ONLY,
-        max_results=1,
-    )
-    if len(runs) > 0:
-        run = runs.iloc[0]
-        if run.status != 'RUNNING':
-            run_id = run.run_id
-            val_accuracy_history = client.get_metric_history(
-                run_id, "val_accuracy")
-            accuracy_history = client.get_metric_history(
-                run_id, "train_accuracy")
-            val_loss_history = client.get_metric_history(run_id, "val_loss")
-            loss_history = client.get_metric_history(run_id, "train_loss")
-
-            max_idx, best_val_accuracy, best_val_accuracy_metric = find_argmax_by_attr(
-                val_accuracy_history, 'value')
-            best_epoch = best_val_accuracy_metric.step
-
-            print(
-                "Training-Accuracy={}".format(accuracy_history[best_epoch].value))
-            print("Training-Loss={}".format(loss_history[best_epoch].value))
-            # Objective metric, used to estimate performace
-            print("Validation-Accuracy={}".format(best_val_accuracy))
-            print(
-                "Validation-Loss={}".format(val_loss_history[best_epoch].value))
-            break
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        print("Training-Accuracy={}".format(data.get('train_accuracy')))
+        print("Training-Loss={}".format(data.get('train_loss')))
+        # Objective metric, used to estimate performace
+        print("Validation-Accuracy={}".format(data.get('val_accuracy')))
+        print("Validation-Loss={}".format(data.get('val_loss')))
+        break
     time.sleep(10)
