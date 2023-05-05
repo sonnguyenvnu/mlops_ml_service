@@ -5,9 +5,6 @@ import numpy as np
 import tensorflow as tf
 import requests
 
-TPU_ADDR = os.getenv('KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS')
-print('Connecting to TPU: ', TPU_ADDR)
-
 parser = argparse.ArgumentParser(description='Create TFRecord dataset')
 parser.add_argument('--gcs_folder', type=str, default="", metavar='N',
                     help='GCS image folder')
@@ -49,11 +46,11 @@ CLASSES = convert_to_byte_classes(args.classes)
 
 def calculate_shards(num_images):
     num_shards = 1
-    if num_images > 100 and num_images < 500:
+    if num_images > 200 and num_images <= 500:
         num_shards = 2
     if num_images > 500 and num_images < 1000:
         num_shards = 4
-    if num_images > 1000:
+    if num_images >= 1000:
         num_shards = num_images // 250
     shard_size = math.ceil(1.0 * num_images / num_shards)
     print("Total {} images which will be rewritten as {} .tfrec files containing {} images each.".format(
@@ -196,9 +193,8 @@ def write_tfrecord_dataset():
     dataset = dataset.batch(shard_size)
     write_dataset(dataset, CLASSES, GCS_OUTPUT)
 
-
 try:
-    tpu = tf.distribute.cluster_resolver.TPUClusterResolver.connect(TPU_ADDR)
+    tpu = tf.distribute.cluster_resolver.TPUClusterResolver.connect()
     strategy = tf.distribute.TPUStrategy(tpu)
 except ValueError:
     strategy = tf.distribute.MirroredStrategy()

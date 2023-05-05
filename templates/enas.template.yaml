@@ -172,4 +172,9 @@ spec:
                     secretKeyRef:
                       name: mlflow-secret
                       key: credential-file
+                - name: BACKEND_SERVICE_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secret
+                      key: backend-service
             restartPolicy: Never
