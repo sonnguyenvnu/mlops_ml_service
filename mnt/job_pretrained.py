@@ -20,12 +20,12 @@ args = parser.parse_args()
 print('>>> Args:', args)
 
 pretrained_models = ['EfficientNetB0', 'EfficientNetV2B0', 'EfficientNetB1',
-                     'DenseNet121', 'MobileNetV2', 'MobileNet', 'NASNetMobile', 'EfficientNetV2B1', 'EfficientNetB2', 'EfficientNetV2B2', 'EfficientNetB3', 'DenseNet169', 'EfficientNetV2B3',
-                     'EfficientNetB4', 'DenseNet201', 'EfficientNetV2S', 'Xception', 'InceptionV3', 'ResNet50V2', 'ResNet50', 'ConvNeXtTiny',
+                     'DenseNet121', 'MobileNetV2', 'MobileNet', 'NASNetMobile', 'Xception', 'InceptionV3', 'DenseNet201',
+                     'DenseNet169', 'VGG16', 'VGG19', 'EfficientNetV2B1', 'EfficientNetB2', 'EfficientNetV2B2', 'EfficientNetB3', 'EfficientNetV2B3',
+                     'EfficientNetB4', 'EfficientNetV2S', 'ResNet50V2', 'ResNet50', 'ConvNeXtTiny',
                      'EfficientNetB5', 'EfficientNetB6', 'ResNet101V2', 'ResNet101', 'ConvNeXtSmall', 'EfficientNetV2M', 'InceptionResNetV2',
-                     'ResNet152V2', 'ResNet152', 'EfficientNetB7', 'ConvNeXtBase', 'NASNetLarge', 'EfficientNetV2L', 'VGG16', 'VGG19',
+                     'ResNet152V2', 'ResNet152', 'EfficientNetB7', 'ConvNeXtBase', 'NASNetLarge', 'EfficientNetV2L',
                      'ConvNeXtLarge', 'ConvNeXtXLarge']
-
 
 def create_train_jobs(args):
     q = rediswq.RedisWQ(name=args.queue_name, host=args.redis_host)

@@ -44,6 +44,24 @@ def find_argmax_by_attr(lst, attr):
             max_idx = i
     return max_idx, max_val, max_obj
 
+def parse_training_history(history):
+  data = []
+  for idx, metric in enumerate(history):
+    name = f"{idx}"
+    value = round(metric.value, 2)
+    data.append({ 'name': name, 'value': value })
+  return data
+
+
+def get_training_graph(run_id):
+  val_acc_history = client.get_metric_history(run_id, "val_accuracy")
+  val_loss_history = client.get_metric_history(run_id, "val_loss")
+  data = {
+    'val_acc_history': parse_training_history(val_acc_history),
+    'val_loss_history': parse_training_history(val_loss_history),
+  }
+  return data
+
 def best_accuracy(experiment_name, for_deployment=False):
   best_val_accuracy = 0
   best_run_info = {}
@@ -58,6 +76,9 @@ def best_accuracy(experiment_name, for_deployment=False):
     order_by=["metrics.val_accuracy DESC"]
   )
 
+  if len(runs) == 0:
+    return
+
   for _, run in runs.iterrows():
     run_info = dict(run)
     val_accuracy_history = client.get_metric_history(run_info.get('run_id'), "val_accuracy")
@@ -67,7 +88,7 @@ def best_accuracy(experiment_name, for_deployment=False):
       best_run_info = run_info
   
   result = { 
-    'best_val_accuracy': best_val_accuracy, 
+    'best_val_accuracy': round(best_val_accuracy * 100, 2), 
     'run_id': best_run_info.get('run_id'),
     'run_name': best_run_info.get('tags.mlflow.runName'),
     'model_url': f"gs://pixelbrain/models/{experiment_name}/{best_run_info.get('run_id')}",
@@ -75,5 +96,3 @@ def best_accuracy(experiment_name, for_deployment=False):
 
   return result
 
-# def best_model(experiment_name):
-#   return list_models(experiment_name)[0]

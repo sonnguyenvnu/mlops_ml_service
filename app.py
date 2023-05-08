@@ -4,7 +4,7 @@ import time
 from flask import Flask, request
 from flask_cors import CORS
 from jinja2 import Template
-from mlflow_client import best_accuracy
+from mlflow_client import best_accuracy, get_training_graph
 
 app = Flask(__name__)
 CORS(app)
@@ -13,19 +13,6 @@ CORS(app)
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
-
-# @app.route('/clf/train', methods=['GET'])
-# def train_model():
-#     # host = os.getenv('REDIS_ADDR')
-#     # host = 'redis'
-#     # queue_name = "job2"
-#     # create_train_jobs(host, queue_name)
-#     os.system(f"kubectl apply -f ./yaml/redis.yaml &")
-#     os.system(f"kubectl apply -f ./yaml/push.yaml &")
-#     os.system(f"kubectl apply -f ./yaml/job_pretrained.yaml &")
-#     os.system(f"kubectl apply -f ./yaml/enas.yaml &")
-#     os.system(f"kubectl apply -f ./yaml/job_automl.yaml &")
-#     return {'message': 'Training in progress'}, 202
 
 def get_template_file(path):
     with open(path, 'r', encoding='UTF-8') as file:
@@ -51,19 +38,17 @@ def train():
     push_job_template = get_template_file(
         './templates/push_job_pretrained.template.yaml')
 
-    # jinja2_template = Template(push_job_template)
-    # content = jinja2_template.render(data)
-    # dst_path = f"./push_job_pretrained_{data.get('experiment_name')}.yaml"
-    # save_file(content, dst_path)
-    # os.system(f"kubectl apply -f {dst_path} &")
+    jinja2_template = Template(push_job_template)
+    content = jinja2_template.render(data)
+    dst_path = f"./push_jobs_{data.get('experiment_name')}.yaml"
+    save_file(content, dst_path)
+    os.system(f"kubectl apply -f {dst_path} &")
 
-    # template = Template(pretrained_template)
-    # content = template.render(data)
+    template = Template(pretrained_template)
+    content = template.render(data)
 
-    content = ""
     template = Template(enas_template)
-    # 5 to 20 layers
-    for i in range(4, 5):
+    for i in range(10, 17):
         data['num_layers'] = i
         content += template.render(data)
     dst_path = f"./train_{data.get('experiment_name')}.yaml"
@@ -79,8 +64,11 @@ def train():
 def stop_train():
     experiment_name = request.args.get('experiment_name')
     os.system(f"kubectl -n kubeflow delete -f ./dataset_{experiment_name}.yaml")
+    os.system(f"kubectl -n kubeflow delete -f ./push_jobs_{experiment_name}.yaml")
     os.system(f"kubectl -n kubeflow delete -f ./train_{experiment_name}.yaml")
+    os.system(f"kubectl -n kubeflow delete -f ./yaml/redis.yaml")
     os.system(f"rm -rf ./dataset_{experiment_name}.yaml")
+    os.system(f"rm -rf ./push_jobs_{experiment_name}.yaml")
     os.system(f"rm -rf ./train_{experiment_name}.yaml")
     return {'message': 'Training stopped'}
 
@@ -95,20 +83,15 @@ def write_dataset():
     dst_path = f"./dataset_{data.get('experiment_name')}.yaml"
     save_file(content, dst_path)
     os.system(f"kubectl apply -f {dst_path} &")
-    return {'status': 'OK'}
+    os.system(f"kubectl -n kubeflow apply -f ./yaml/redis.yaml &")
+    return {'experiment_name': data.get('experiment_name')}
 
 
-@app.route('/clf/deploy', methods=['GET'])
+@app.route('/clf/deploy', methods=['POST'])
 def deploy():
-    # data = request.json
-    # classes_str = ' '.join(data.get('classes'))
-    # data['classes'] = classes_str
-    data = {
-        'classes': 'daisy dandelion roses sunflowers tulips',
-        'target_size': 224,
-        'model_dir': 'gs://uet-mlflow/example_experiment/06d964a0070f45709edcfabb9854fd62/models/ckpt_epoch_7',
-        'experiment_name': 'kashuiyweiruiw',
-    }
+    data = request.json
+    classes_str = ' '.join(sorted(data.get('classes')))
+    data['classes'] = classes_str
 
     deploy_template = get_template_file(
         './templates/docker-compose.template.yaml')
@@ -116,6 +99,7 @@ def deploy():
     content = jinja2_template.render(data)
     dst_path = f"./deploy_{data.get('experiment_name')}.yaml"
     save_file(content, dst_path)
+    os.system('sudo kill -9 $(sudo lsof -ti:4000)')
     os.system(f"docker-compose -f {dst_path} up -d --force-recreate --build")
 
     return {'status': 'OK'}
@@ -125,7 +109,15 @@ def best_experiment_model():
     experiment_name = request.args.get('experiment_name')
     for_deployment = request.args.get('for_deployment')
     data = best_accuracy(experiment_name, for_deployment)
-    return data
+    print(data)
+    if data:
+        return data
+    return { 'message': 'Provisioning TPU...' }, 422
+
+@app.route('/train/history', methods=['GET'])
+def get_training_history():
+    run_id = request.args.get('run_id')
+    return get_training_graph(run_id=run_id)
 
 if __name__ == '__main__':
     app.run(port=4000)

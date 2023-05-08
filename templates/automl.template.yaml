@@ -6,8 +6,9 @@ metadata:
   name: training-automl-{{ experiment_name }}
   namespace: kubeflow
 spec:
-  parallelism: 2
+  parallelism: 4
   ttlSecondsAfterFinished: 60
+  activeDeadlineSeconds: 86400
   template:
     metadata:
       name: training-automl-{{ experiment_name }}

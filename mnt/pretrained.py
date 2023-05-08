@@ -110,6 +110,8 @@ def train_model(train_config):
 
         best_epoch = 0
         best_val_accuracy = 0
+        # path to save model
+        path = f"gs://{model_dir}/{experiment_name}/{run_id}"
         # dict: { epoch: metrics }
         history_data = {}
         for e in range(num_epochs):
@@ -137,6 +139,20 @@ def train_model(train_config):
 
             if history.history['val_accuracy'][0] > metric_history[best_epoch].value:
                 best_epoch = e
+            
+            if e % 10 == 9:
+                # save model
+                model = load_best_model()
+                print(f"Saving best model to {path}...")
+                model.save(path)
+
+                # save run info
+                run_info = history_data.get(best_epoch)
+                run_info['experiment_name'] = experiment_name
+                run_info['run_id'] = run_id
+                run_info['name'] = run_name
+                run_info['best_model_url'] = path
+                save_run_info(run_info)
             if e >= patience:
                 monitor_history = metric_history[-patience:]
                 max_idx, max_value, max_metric = find_argmax_by_attr(
@@ -145,19 +161,5 @@ def train_model(train_config):
                     print("Early stopping at epoch {}".format(e))
                     break
 
-        # save best model to GCS
-        path = f"gs://{model_dir}/{experiment_name}/{run_id}"
-        model = load_best_model()
-        print(f"Saving best model to {path}...")
-        model.save(path)
         mlflow.end_run()
-
-        # save run info
-        run_info = history_data.get(best_epoch)
-        run_info['experiment_name'] = experiment_name
-        run_info['run_id'] = run_id
-        run_info['name'] = run_name
-        run_info['best_model_url'] = path
-
-        save_run_info(run_info)
         print('>>> Best epoch: ', best_epoch + 1)
