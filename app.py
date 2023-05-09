@@ -48,7 +48,7 @@ def train():
     content = template.render(data)
 
     template = Template(enas_template)
-    for i in range(10, 17):
+    for i in range(10, 21):
         data['num_layers'] = i
         content += template.render(data)
     dst_path = f"./train_{data.get('experiment_name')}.yaml"
