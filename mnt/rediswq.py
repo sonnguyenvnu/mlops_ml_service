@@ -2,6 +2,7 @@ import redis
 import uuid
 import hashlib
 
+
 class RedisWQ(object):
     """Simple Finite Work Queue with Redis Backend
 
@@ -14,20 +15,21 @@ class RedisWQ(object):
     This object is not intended to be used by multiple threads
     concurrently.
     """
+
     def __init__(self, name, **redis_kwargs):
-       """The default connection parameters are: host='localhost', port=6379, db=0
+        """The default connection parameters are: host='localhost', port=6379, db=0
 
        The work queue is identified by "name".  The library may create other
        keys with "name" as a prefix. 
        """
-       self._db = redis.StrictRedis(**redis_kwargs)
-       # The session ID will uniquely identify this "worker".
-       self._session = str(uuid.uuid4())
-       # Work queue is implemented as two queues: main, and processing.
-       # Work is initially in main, and moved to processing when a client picks it up.
-       self._main_q_key = name
-       self._processing_q_key = name + ":processing"
-       self._lease_key_prefix = name + ":leased_by_session:"
+        self._db = redis.StrictRedis(**redis_kwargs)
+        # The session ID will uniquely identify this "worker".
+        self._session = str(uuid.uuid4())
+        # Work queue is implemented as two queues: main, and processing.
+        # Work is initially in main, and moved to processing when a client picks it up.
+        self._main_q_key = name
+        self._processing_q_key = name + ":processing"
+        self._lease_key_prefix = name + ":leased_by_session:"
 
     def sessionID(self):
         """Return the ID for this session."""
@@ -47,7 +49,7 @@ class RedisWQ(object):
         False does not necessarily mean that there is work available to work on right now,
         """
         return self._main_qsize() == 0 and self._processing_qsize() == 0
-    
+
     def put(self, item):
         """Put item into the queue."""
         self._db.rpush(self._main_q_key, item)

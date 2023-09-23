@@ -1,9 +1,9 @@
 import os
-import json
-import time
+
 from flask import Flask, request
 from flask_cors import CORS
 from jinja2 import Template
+
 from mlflow_client import best_accuracy, get_training_graph
 
 app = Flask(__name__)
@@ -13,6 +13,7 @@ CORS(app)
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
+
 
 def get_template_file(path):
     with open(path, 'r', encoding='UTF-8') as file:
@@ -60,6 +61,7 @@ def train():
     os.system(f"kubectl apply -f {dst_path} &")
     return {'status': 'OK'}
 
+
 @app.route('/clf/stop', methods=['GET'])
 def stop_train():
     experiment_name = request.args.get('experiment_name')
@@ -71,6 +73,7 @@ def stop_train():
     os.system(f"rm -rf ./push_jobs_{experiment_name}.yaml")
     os.system(f"rm -rf ./train_{experiment_name}.yaml")
     return {'message': 'Training stopped'}
+
 
 @app.route('/clf/dataset', methods=['POST'])
 def write_dataset():
@@ -104,6 +107,7 @@ def deploy():
 
     return {'status': 'OK'}
 
+
 @app.route('/accuracy/best', methods=['GET'])
 def best_experiment_model():
     experiment_name = request.args.get('experiment_name')
@@ -112,12 +116,14 @@ def best_experiment_model():
     print(data)
     if data:
         return data
-    return { 'message': 'Provisioning TPU...' }, 422
+    return {'message': 'Provisioning TPU...'}, 422
+
 
 @app.route('/train/history', methods=['GET'])
 def get_training_history():
     run_id = request.args.get('run_id')
     return get_training_graph(run_id=run_id)
+
 
 if __name__ == '__main__':
     app.run(port=4000)

@@ -20,9 +20,11 @@ spec:
         - 224
         - 224
         - 3
+        # Output của mình là 5 class bao gồm Roses, Dandelion, Sunflowers, Tulips, Daisies
       outputSizes:
         - 5
     operations:
+      # Định nghĩa các operation
       - operationType: convolution
         parameters:
           - name: filter_size

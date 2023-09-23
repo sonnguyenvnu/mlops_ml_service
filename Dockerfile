@@ -14,9 +14,10 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyri
 RUN apt-get update && apt-get install google-cloud-cli -y
 RUN apt-get install kubectl -y
 RUN apt-get install google-cloud-sdk-gke-gcloud-auth-plugin -y
-RUN gcloud auth activate-service-account owner-160@pixelbrain.iam.gserviceaccount.com --key-file=/app/service-account-gcs.json --project=pixelbrain
+RUN gcloud auth activate-service-account nas-rd320@nas-rd320.iam.gserviceaccount.com --key-file=/app/-account-gcs.json --project=nas-rd320
 
 RUN gcloud container clusters get-credentials mlops-cluster --region=us-central1-f && kubectl get node
 
 CMD ["sh", "-c", "flask run --host=0.0.0.0 --port=5000"]
 EXPOSE 5000
+

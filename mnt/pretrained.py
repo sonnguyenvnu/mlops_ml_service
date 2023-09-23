@@ -1,14 +1,11 @@
-import re
-import time
 import os
-import argparse
-import json
-import tensorflow as tf
-import numpy as np
+
 import mlflow
-from tensorflow.keras.callbacks import ModelCheckpoint
-from train_util import load_datasets
 import requests
+import tensorflow as tf
+
+from train_util import load_datasets
+
 
 def find_argmax_by_attr(lst, attr):
     max_val = None
@@ -26,7 +23,7 @@ def find_argmax_by_attr(lst, attr):
 def create_model(pretrained_model_name, num_classes, image_size):
     model_fn = getattr(tf.keras.applications, pretrained_model_name)
     pretrained_model = model_fn(weights='imagenet', input_shape=[
-                                *image_size, 3], include_top=False)
+        *image_size, 3], include_top=False)
 
     pretrained_model.trainable = True
 
@@ -47,9 +44,9 @@ def create_model(pretrained_model_name, num_classes, image_size):
 
 
 def save_model_temporary(model):
-  save_locally = tf.saved_model.SaveOptions(
-      experimental_io_device='/job:localhost')
-  model.save('./best_model', options=save_locally)
+    save_locally = tf.saved_model.SaveOptions(
+        experimental_io_device='/job:localhost')
+    model.save('./best_model', options=save_locally)
 
 
 def load_best_model():
@@ -132,14 +129,14 @@ def train_model(train_config):
 
             metric_history = client.get_metric_history(run_id, "val_accuracy")
             if val_accuracy > best_val_accuracy:
-              print(
-                  f">>> {val_accuracy} > {best_val_accuracy}, save_model_temporary")
-              save_model_temporary(model)
-              best_val_accuracy = val_accuracy
+                print(
+                    f">>> {val_accuracy} > {best_val_accuracy}, save_model_temporary")
+                save_model_temporary(model)
+                best_val_accuracy = val_accuracy
 
             if history.history['val_accuracy'][0] > metric_history[best_epoch].value:
                 best_epoch = e
-            
+
             if e % 10 == 9:
                 # save model
                 model = load_best_model()
